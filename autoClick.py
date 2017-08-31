@@ -4,7 +4,7 @@ from PIL import ImageGrab
 import time
 import os
 import argparse  # Command line parsing
-
+import random
 
 
 # im0 =ImageGrab.grab((300, 100, 1400, 600))  
@@ -17,17 +17,10 @@ def parseArgs():
     parser = argparse.ArgumentParser()
     
     globalArgs = parser.add_argument_group('Global options')
-    globalArgs.add_argument('--subDir', type=str, help='dir of you movieSub')
-    globalArgs.add_argument('--mode',   type=str,
-                                        choices=['mergevocab','convert','mergesub'],
-                                        default='mergesub'
-                            )
+    globalArgs.add_argument('--rootDir', type=str, default = '/shareDisk/autoTest' ,help='dir of you movieSub')
+    globalArgs.add_argument('--mode', type=str,choices=['ghost','exp','god'],default='ghost')
+    globalArgs.add_argument('--user', type=str,choices=['master','slaver'],default='ghost')
     globalArgs.add_argument('--tag', type=str, default='train')
-    globalArgs.add_argument('--fileType', type=str, default='ass,sub,txt')
-    globalArgs.add_argument('--sourceCode', type=str, default='utf-8')
-    globalArgs.add_argument('--splitCode', type=str, default='-->')
-    globalArgs.add_argument('--minVocab', type=int, default=1)
-    globalArgs.add_argument('--splitWord', type=str, default='on')
     return parser.parse_args()
 
 def getGray(image_file):
@@ -82,31 +75,62 @@ def checkImage(tag,fileName,fileNameBase):
 
     b=getImgHash(fileName,False)
     compare=getMH(imageHashBase[tag],b)
-    print('   相似度:' + str(compare) + '%')
+    # print('   相似度:' + str(compare) + '%')
     return compare
 
+def clickScreen(x1Random,y1Random):
+    m.click(x1Random + random.randint(3,6),y1Random + random.randint(3,6),1)
+    print('   move mouse to:' + str(x1Random + random.randint(3,6)) +','+ str(y1Random + random.randint(3,6)))
 
-def checkArea(tag,r,x1,y1,x2,y2):
-    print(tag + ':\t'+str(r))
+def checkArea(tag,r,minSim):
+
     fileBaseName = os.path.join(baseDir , tag+'.base.'+'jpeg')
-    fileName = os.path.join(hisDir ,'{}.{}.jpeg'.format(tag,str(r))) 
+    fileName = os.path.join(hisDir ,'{}.{}.jpeg'.format(tag,str(r)))
+    x1 = int(imageSize[tag].split(',')[0].strip())
+    y1 = int(imageSize[tag].split(',')[1].strip())
+    x2 = int(imageSize[tag].split(',')[2].strip())
+    y2 = int(imageSize[tag].split(',')[3].strip())
+
+    clickX1 = int(imageSize[tag].split(',')[4].strip())
+    clickY1 = int(imageSize[tag].split(',')[5].strip())
+    clickX2 = int(imageSize[tag].split(',')[6].strip())
+    clickY2 = int(imageSize[tag].split(',')[7].strip())
+
     im0 =ImageGrab.grab((x1, y1, x2, y2))
     im0 =  im0.convert('RGB')
 
-    im0=im0.resize((24, 24))#重置图片大小24px X 24px
-
+    #im0=im0.resize((24, 24))#重置图片大小24px X 24px
     #im0.save(fileName)
+
     if not os.path.exists(fileBaseName):
         im0.save(fileBaseName)
         imageHashBase[tag] = getImgHash(im0,'Memory')
-        #imageHashBase[tag] = getImgHash(fileBaseName,'File')
     
     if not tag in imageHashBase:
         imageHashBase[tag] = getImgHash(fileBaseName,'File')
+    
 
     imageSim = checkImage(tag,im0,fileBaseName)
-    if imageSim >= 97:
-        print('   click')
+    if imageSim >= minSim:
+        print(tag + ':\t'+str(r) +'\t相似度:' + str(imageSim) + '%')
+        x1Random = random.randint(clickX1 + 1, clickX2 - 1)
+        y1Random = random.randint(clickY1 + 1, clickY2 - 1) 
+
+        for i in range(random.randint(2,4)):    
+            clickScreen(x1Random,y1Random)
+        
+        if tag =='success.master' or tag =='success.slaver' :
+            for i in range(random.randint(2,4)):   
+                print(" click agagin")
+                time.sleep(random.randint(1,30)/10)
+                x1Random = random.randint(99 + 1, 999 - 1)
+                y1Random = random.randint(650 + 1, 750 - 1) 
+                clickScreen(x1Random,y1Random)
+
+def loadSize():
+    f = open(os.path.join(rootDir, 'size.conf'),'r')
+    for line in f:
+        imageSize[line.split(':')[0]]=line.split(':')[1]
 
 def cleanHisImage(r):
     fileList = [os.path.join(hisDir, f) for f in os.listdir(hisDir)]
@@ -116,21 +140,49 @@ def cleanHisImage(r):
             fNum = f.split('.')[1]
             if int(fNum)>r or int(fNum)<=r - 10:
                 os.remove(f)
+def subGod():
+    pass
 
+def subExp():
+    pass
+
+def subSlaverGhost():
+    checkArea('prepare.slaver',r,90)
+    checkArea('teamSlave.slaver',r,90)
+    checkArea('success.slaver',r,90)
+
+def subMasterGhost():
+    checkArea('prepare.master',r,90)
+    checkArea('startFight.master',r,90)
+    checkArea('startTeam.master',r,90)
+    checkArea('success.master',r,90)
 
 if __name__ == "__main__":
-    rootDir = '/shareDisk/autoTest'
-    hisDir = os.path.join(rootDir,'imgHis')
-    baseDir =  os.path.join(rootDir,'imgBase')
 
     args = parseArgs()
+    rootDir = args.rootDir
+    hisDir = os.path.join(rootDir,'imgHis')
+    baseDir =  os.path.join(rootDir,'imgBase')
+    m = PyMouse() 
+
     imageHashBase ={}
+    imageSize = {}
 
     r = 0
+    loadSize()
+
     while True: 
         r += 1
-        checkArea('tag1',r,100,100,300,200)
-        checkArea('tag2',r,100,100,200,200)
-        time.sleep(3)
+        loadSize()
+        if args.mode == 'ghost' and args.user == 'master':
+            subMasterGhost()
+        elif args.mode == 'ghost' and args.user == 'slaver':
+            subSlaverGhost()    
+        elif args.mode == 'exp':
+            subGod()            
+        elif args.mode == 'god':
+            subGod()   
+
+        time.sleep(random.randint(1,50)/10)
         if r%10 == 1:
             cleanHisImage(r)
